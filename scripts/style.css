@@ -1,0 +1,10 @@
+body {
+    margin: 0;
+}
+
+#glCanvas {
+    position: relative;
+    border: medium solid black;
+    width: 100%;
+    height: 100vh;
+}

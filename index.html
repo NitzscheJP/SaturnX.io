@@ -1,0 +1,130 @@
+<html>
+
+<head>
+    <title>SaturnX</title>
+</head>
+<link rel="stylesheet" type="text/css" href="scripts/style.css">
+
+<body>
+    <canvas id="glCanvas" width:50px height:50px></canvas>
+    <script id="vs" type="notjs">
+        # version 300 es
+        in vec4 a_position;
+        in vec4 a_normal;
+        uniform float u_time;
+        uniform mat4 u_Pmatrix;
+        uniform mat4 u_Vmatrix;
+        uniform mat4 u_Mmatrix;
+        uniform int u_isSaturn;
+        out vec4 normal;
+        out vec4 position;
+        void main() {
+            if (u_isSaturn == 1) {
+                mat4 H = u_Pmatrix * u_Vmatrix * u_Mmatrix;
+                normal = normalize(a_normal);
+                position = a_position;
+                gl_Position = H * a_position;
+            } else {
+                mat4 H = u_Pmatrix * u_Vmatrix * u_Mmatrix;
+                normal = normalize(a_normal);
+                position = a_position;
+                gl_Position = H * a_position;
+                gl_PointSize = a_normal.x * 1.3;
+            }
+        }
+    </script>
+    <script id="fs" type="notjs">
+        #version 300 es
+        precision mediump float;
+        in vec4 normal;
+        in vec4 position;
+        uniform vec4 u_color;
+        uniform vec3 u_vvec;
+        uniform highp int u_isSaturn;
+        uniform highp float u_time;
+        out vec4 color_out;
+
+        float random1d(float x) {
+            highp float dt= x * 10.0;
+            highp float sn = mod(dt,3.14159265358979323846);
+            return fract(sin(dt)); 
+        }
+
+        void main() {
+            float theta_l = 3.14 * 0.15 * (-cos(u_time / 5.0) + 1.1);
+            vec3 sunloc = 10.0 * vec3(0.0, sin(theta_l), cos(theta_l));
+            vec3 l = vec3(0.0, sin(theta_l), cos(theta_l));
+            vec3 n = normal.xyz;
+            vec3 v = u_vvec;
+            if (u_isSaturn == 1) {
+                float rho = length(vec2(position.x, position.z));
+                if (rho < 1.01) {
+                    vec3 p = position.xyz;
+                    vec3 rgb;
+                    float fbm = 0.0;
+                    for (int i = 1; i <= 10; i += 1) {
+                        fbm += random1d((p.y + u_time * 0.05) * float(i) * 0.5);
+                    }
+                    fbm /= 6.0;
+                    fbm += 0.1;
+                    rgb = vec3(fbm)*vec3(227.0/255.0,190.0/255.0,140.0/255.0);
+                    /* mask shadow*/
+                    float sdw = smoothstep(-0.5, 0.1, dot(n, l));
+                    rgb = sdw * rgb;
+                    float t = p.y/l.y;
+                    float rs = length(p - t * l);
+                    float sdw_ring = (smoothstep(0.90 * 2.25, 1.0 * 2.25, rs) + (1.0 - smoothstep(1.3, 1.2*1.3, rs))) * step(t, 0.0) + step(-t, 0.0);
+                    rgb = sdw_ring * rgb;
+
+                    /* 散乱 */
+                    vec3 white = vec3(1.0, 1.0, 1.0);
+                    float ratio = sdw * pow(length(cross(p, v)), 2.0);
+                    float q = 0.15;
+                    rgb = q * ratio * white + (1.0 - q) * rgb;
+
+                    color_out = vec4(rgb, 1.0);
+                } else {
+                    vec3 p = position.xyz;
+                    vec3 rgb;
+                    float fbm = 0.0;
+                    for (int i = 1; i <= 17; i += 1) {
+                        fbm += random1d(0.3 * rho * float(i) * (1.1 + sin(u_time * 0.05)) + u_time * 0.05);
+                    }
+                    fbm /= 10.0;
+                    rgb = vec3(fbm)*vec3(210.0/255.0,180.0/255.0,140.0/255.0);
+                    if ((rho > 2.21 && rho < 2.23)) {
+                        rgb = 0.2 * rgb;
+                    } else if ((rho < 1.6)) {
+                        rgb = 0.4 * vec3(pow(fbm, 6.0))*vec3(210.0/255.0,180.0/255.0,140.0/255.0);
+                    }
+                    float s = smoothstep(-0.1, 0.1, dot(n, l)) * step(-v.y, 0.0) + 0.7 * smoothstep(-0.1, 0.1, dot(n, l)) * step(v.y, 0.0);
+                    vec3 lp = normalize(sunloc - p);
+                    s = s * (dot(v, lp) + 2.0) / 2.2;
+                    rgb = s * rgb;
+
+                    /* mask shadow*/
+                    float sdw = smoothstep(0.90, 1.0, length(cross(p, -l))) * step(dot(p, l), 0.0) + step(dot(p, -l), 0.0);
+                    rgb = sdw * rgb;
+                    vec3 white = vec3(1.0, 1.0, 1.0);
+                    float ratio = sdw * pow(length(cross(p, v)), 2.0);
+                    float q = 0.01;
+                    rgb = q * ratio * white + (1.0 - q) * rgb;
+                    color_out = vec4(rgb, 1.0);
+                }
+                /* Lighting*/
+            } else {
+                vec3 pos = position.xyz;
+                vec2 p = gl_PointCoord * 2.0 - 1.0; // normalize
+                if (dot(p, p) > 1.0) {
+                    discard;
+                }
+                vec3 rgb = vec3(exp(-dot(p, p)/0.1));
+                color_out = vec4(rgb, 1.0);
+            }
+        }
+    </script>
+    <script type="text/javascript" src="scripts/gl-matrix.js"></script>
+    <script type="text/javascript" src="scripts/context.js"></script>
+</body>
+
+</html>
